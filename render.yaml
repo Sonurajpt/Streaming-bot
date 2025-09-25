@@ -7,4 +7,4 @@ services:
       - key: TELEGRAM_TOKEN
         sync: false
       - key: PROXY_BASE
-        value: "https://<your-app-name>.onrender.com/proxy?url="
+        value: "https://streaming-bot-1.onrender.com/proxy?url="
