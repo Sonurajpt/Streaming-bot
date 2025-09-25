@@ -23,8 +23,12 @@ logging.basicConfig(
 logger = logging.getLogger("terabox-bot")
 
 if not TELEGRAM_TOKEN:
-    logger.error("TELEGRAM_TOKEN is not set in environment. Exiting.")
-    raise SystemExit("TELEGRAM_TOKEN not configured")
+    logger.error("Here is the token for bot CDN_stream @CDN_streambot:
+
+"8421861342:AAGfEPnhWSgLbCIN9ZjZMVnzAvCybuSUHfM" is not set in environment. Exiting.")
+    raise SystemExit("Here is the token for bot CDN_stream @CDN_streambot:
+
+"8421861342:AAGfEPnhWSgLbCIN9ZjZMVnzAvCybuSUHfM not configured")
 
 def extract_possible_share_id(url: str):
     """
