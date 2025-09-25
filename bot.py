@@ -12,7 +12,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 
 # --- config ---
 TELEGRAM_TOKEN = os.environ.get("8421861342:AAGfEPnhWSgLbCIN9ZjZMVnzAvCybuSUHfM")
-PROXY_BASE = os.environ.get("PROXY_BASE", "")  # e.g. https://<your-app>.onrender.com/proxy?url=
+PROXY_BASE = os.environ.get("https://streaming-bot-1.onrender.com/proxy?url=", "")  # e.g. https://<your-app>.onrender.com/proxy?url=
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
 # --- logging ---
