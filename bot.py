@@ -11,8 +11,8 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # --- config ---
-TELEGRAM_TOKEN = os.environ.get("8421861342:AAGfEPnhWSgLbCIN9ZjZMVnzAvCybuSUHfM")
-PROXY_BASE = os.environ.get("https://streaming-bot-1.onrender.com/proxy?url=", "")  # e.g. https://<your-app>.onrender.com/proxy?url=
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+PROXY_BASE = os.environ.get("PROXY_BASE", "")  # Example: https://streaming-bot-1.onrender.com/proxy?url=
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
 # --- logging ---
@@ -22,117 +22,82 @@ logging.basicConfig(
 )
 logger = logging.getLogger("terabox-bot")
 
+# --- token check ---
 if not TELEGRAM_TOKEN:
-    logger.error("Here is the token for bot CDN_stream @CDN_streambot:"
+    logger.error("TELEGRAM_TOKEN is not set in environment. Exiting.")
+    raise SystemExit("TELEGRAM_TOKEN is not configured")
 
-"8421861342:AAGfEPnhWSgLbCIN9ZjZMVnzAvCybuSUHfM" is not set in environment. Exiting.")
-    raise SystemExit("Here is the token for bot CDN_stream @CDN_streambot:"
 
-"8421861342:AAGfEPnhWSgLbCIN9ZjZMVnzAvCybuSUHfM" not configured")
-
+# --- helper: extract share id ---
 def extract_possible_share_id(url: str):
-    """
-    Simple heuristics to find TeraBox share id or return original url if nothing special.
-    Adjust patterns if needed.
-    """
-    patterns = [
-        r"(https?:\/\/(?:www\.)?terabox\.com\/[^\s]*)",
-        r"(https?:\/\/(?:www\.)?terabox\.cn\/[^\s]*)",
-    ]
-    for p in patterns:
-        m = re.search(p, url)
-        if m:
-            return m.group(1)
-    return url
+    if not url:
+        return None
+    match = re.search(r"/s/([a-zA-Z0-9]+)", url)
+    return match.group(1) if match else None
 
-def find_direct_video(url: str, timeout=15):
-    """
-    Try to extract direct .m3u8/.mp4 link from page HTML/scripts.
-    Returns the first match or None.
-    """
-    headers = {"User-Agent": USER_AGENT}
-    resp = requests.get(url, headers=headers, timeout=timeout)
-    resp.raise_for_status()
-    html = resp.text
 
-    # quick search for obvious urls
-    m = re.search(r"https?:\/\/[^\s'\"<>]+(?:\.m3u8|\.mp4)[^\s'\"<>]*", html)
-    if m:
-        return m.group(0)
+# --- helper: find direct video link ---
+def find_direct_video(url: str):
+    try:
+        headers = {"User-Agent": USER_AGENT}
+        target_url = url
 
-    # parse scripts for JSON-like objects
-    soup = BeautifulSoup(html, "html.parser")
-    for script in soup.find_all("script"):
-        txt = script.string
-        if not txt:
-            continue
-        m = re.search(r"https?:\/\/[^\s'\"<>]+(?:\.m3u8|\.mp4)[^\s'\"<>]*", txt)
-        if m:
-            return m.group(0)
+        # Agar proxy diya gaya hai to proxy ke through request kare
+        if PROXY_BASE:
+            target_url = f"{PROXY_BASE}{url}"
 
-    return None
+        resp = requests.get(target_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        html = resp.text
 
+        soup = BeautifulSoup(html, "html.parser")
+        video_tag = soup.find("video")
+        if video_tag and video_tag.get("src"):
+            return video_tag["src"]
+
+        # fallback regex
+        match = re.search(r'https?://[^"\']+\.mp4', html)
+        if match:
+            return match.group(0)
+
+        return None
+    except Exception as e:
+        logger.error(f"Error in find_direct_video: {e}")
+        return None
+
+
+# --- commands ---
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Send me a TeraBox share link and I'll try to extract a streaming URL (only for files you have permission to access).")
+    update.message.reply_text("👋 Hi! Send me a Terabox link and I'll try to fetch a direct video link.")
 
-def help_cmd(update: Update, context: CallbackContext):
-    update.message.reply_text("Send a TeraBox share link (https://...). I'll look for mp4/m3u8 and return direct or proxied URL.")
 
 def handle_message(update: Update, context: CallbackContext):
-    txt = (update.message.text or "").strip()
-    chat_id = update.message.chat_id
-    logger.info("Received message from %s: %s", chat_id, txt[:200])
-
-    if not txt:
-        update.message.reply_text("Please send a valid URL.")
+    text = update.message.text.strip()
+    if not text.startswith("http"):
+        update.message.reply_text("❌ Please send a valid Terabox link.")
         return
 
-    update.message.reply_text("Checking the link — dekh raha hoon...")
+    update.message.reply_text("⏳ Processing your link... Please wait.")
 
-    # Sanitize / normalize
-    target = extract_possible_share_id(txt)
-
-    try:
-        video = find_direct_video(target)
-    except requests.RequestException as e:
-        logger.warning("Request error while fetching %s: %s", target, e)
-        update.message.reply_text(f"Error fetching the page: {e}")
-        return
-    except Exception as e:
-        logger.exception("Unexpected error")
-        update.message.reply_text(f"Unexpected error: {e}")
-        return
-
-    if video:
-        # prepare proxied URL if PROXY_BASE set
-        proxied = PROXY_BASE + requests.utils.requote_uri(video) if PROXY_BASE else None
-        msg = f"✅ Direct video URL found:\n{video}"
-        if proxied:
-            msg += f"\n\n▶️ Proxied (use this if player has CORS issues):\n{proxied}"
-        else:
-            msg += "\n\n(If playback fails due to CORS, set PROXY_BASE in env and redeploy.)"
-        update.message.reply_text(msg)
+    video_url = find_direct_video(text)
+    if video_url:
+        update.message.reply_text(f"✅ Direct video link found:\n{video_url}")
     else:
-        update.message.reply_text(
-            "No direct mp4/m3u8 URL found on the page. The page might be JS-rendered or protected.\n"
-            "If you want, deploy a headless scraper (Puppeteer) in the same service and I'll try again."
-        )
+        update.message.reply_text("❌ Sorry, I couldn't extract a direct video link.")
 
-def error_handler(update: object, context: CallbackContext):
-    logger.error("Update caused error: %s", context.error)
 
+# --- main ---
 def main():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    dp.add_error_handler(error_handler)
 
-    logger.info("Starting Telegram bot (polling)...")
+    logger.info("Bot started...")
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == "__main__":
     main()
