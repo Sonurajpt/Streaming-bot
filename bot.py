@@ -43,17 +43,16 @@ def find_direct_video(url: str):
         target_url = url
 
         # Agar proxy diya gaya hai to proxy ke through request kare
-    # ensure proxy base always ends with ?url=
-    if PROXY_BASE:
-    # ensure proxy base always ends with ?url=
-    if not PROXY_BASE.endswith("?url="):
-        proxy_base = PROXY_BASE.rstrip("/") + "/proxy?url="
-    else:
-        proxy_base = PROXY_BASE
-    target_url = f"{proxy_base}{url}"
-else:
-    target_url = url
-    
+        if PROXY_BASE:
+            # ensure proxy base always ends with ?url=
+            if not PROXY_BASE.endswith("?url="):
+                proxy_base = PROXY_BASE.rstrip("/") + "/proxy?url="
+            else:
+                proxy_base = PROXY_BASE
+            target_url = f"{proxy_base}{url}"
+        else:
+            target_url = url
+
         resp = requests.get(target_url, headers=headers, timeout=10)
         resp.raise_for_status()
         html = resp.text
