@@ -20,7 +20,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger("terabox-bot")
+logger = logging.getLogger("CDN_streaming-bot")
 
 # --- token check ---
 if not TELEGRAM_TOKEN:
