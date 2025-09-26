@@ -12,7 +12,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 
 # --- config ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-PROXY_BASE = os.environ.get("PROXY_BASE", "")  # Example: https://streaming-bot-1.onrender.com/proxy?url=
+PROXY_BASE = os.environ.get("PROXY_BASE", "")  # Example: https://streaming-bot-2.onrender.com/proxy?url=
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
 # --- logging ---
@@ -40,29 +40,33 @@ def extract_possible_share_id(url: str):
 def find_direct_video(url: str):
     try:
         headers = {"User-Agent": USER_AGENT}
-        target_url = url
 
-        # Agar proxy diya gaya hai to proxy ke through request kare
+        # Ensure URL has proper scheme
+        if not url.startswith("http"):
+            url = "https://" + url
+
+        # Handle proxy if given
         if PROXY_BASE:
-            # ensure proxy base always ends with ?url=
             if not PROXY_BASE.endswith("?url="):
                 proxy_base = PROXY_BASE.rstrip("/") + "/proxy?url="
             else:
                 proxy_base = PROXY_BASE
-            target_url = f"{proxy_base}{url}"
+            target_url = proxy_base + url
         else:
             target_url = url
 
+        # Fetch HTML
         resp = requests.get(target_url, headers=headers, timeout=10)
         resp.raise_for_status()
         html = resp.text
 
+        # Parse HTML for <video> tag
         soup = BeautifulSoup(html, "html.parser")
         video_tag = soup.find("video")
         if video_tag and video_tag.get("src"):
             return video_tag["src"]
 
-        # fallback regex
+        # Fallback regex for direct MP4
         match = re.search(r'https?://[^"\']+\.mp4', html)
         if match:
             return match.group(0)
